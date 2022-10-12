@@ -4,8 +4,17 @@ namespace Our.Umbraco.TagHelpers.Configuration
 {
     public class OurUmbracoTagHelpersConfiguration
     {
+        public InlineSvgTagHelperConfiguration OurSVG { get; set; } = new InlineSvgTagHelperConfiguration();
         public ImgTagHelperConfiguration OurImg { get; set; } = new ImgTagHelperConfiguration();
     }
+
+    public class InlineSvgTagHelperConfiguration
+    {
+        public bool EnsureViewBox { get; set; } = false;
+        public bool Cache { get; set; } = false;
+        public int CacheMinutes { get; set; } = 180;
+    }
+
     public class ImgTagHelperConfiguration
     {
         /// <summary>
