@@ -14,7 +14,7 @@ using Umbraco.Extensions;
 
 namespace Our.Umbraco.TagHelpers
 {
-    [HtmlTargetElement("our-assets")]
+    [HtmlTargetElement("our-assets", TagStructure = TagStructure.WithoutEndTag)]
     public class OurAssetsTagHelper : TagHelper
     {
         [HtmlAttributeName("add-css")]
@@ -57,12 +57,12 @@ namespace Our.Umbraco.TagHelpers
             if (!string.IsNullOrWhiteSpace(AddCriticalCss))
             {
                 AddFile(AssetType.CriticalCss, AddCriticalCss);
-                return;
+                render = false;
             }
             if (!string.IsNullOrWhiteSpace(AddJs))
             {
                 AddFile(AssetType.Js, AddJs);
-                return;
+                render = false;
             }
 
             if (render)
@@ -76,7 +76,6 @@ namespace Our.Umbraco.TagHelpers
                     {
                         htmlOutput += $"<link rel=\"preload\" href=\"{file}\" as=\"style\" onload=\"this.onload=null;this.rel='stylesheet'\">";// how to add asp-append-version="true"?
                         htmlOutput += $"<noscript><link rel=\"stylesheet\" href=\"{file}\"></noscript>";
-                        AddPreConnectUri(preConnectUris, file);
                     }
                 }
                 if (RenderCriticalCss)
@@ -93,14 +92,13 @@ namespace Our.Umbraco.TagHelpers
                     foreach (string file in files)
                     {
                         htmlOutput += $"<script src=\"{file}\" type=\"module\"></script>";
-                        AddPreConnectUri(preConnectUris, file);
                     }
                 }
-                if (RenderPreConnect && preConnectUris != null && preConnectUris.Any())
+                if (RenderPreConnect)
                 {
-                    foreach (Uri uri in preConnectUris)
+                    foreach (string url in GetPreConnectUrls())
                     {
-                        htmlOutput += $"<link rel=\"preconnect\" href=\"{uri.GetLeftPart(UriPartial.Authority)}\">";
+                        htmlOutput += $"<link rel=\"preconnect\" href=\"{url}\">";
                     }
                 }
 
@@ -108,14 +106,6 @@ namespace Our.Umbraco.TagHelpers
             }
         }
 
-        private static void AddPreConnectUri(List<Uri> preConnectUris, string file)
-        {
-            if (!file.StartsWith("http", StringComparison.InvariantCultureIgnoreCase))
-            {
-                return;
-            }
-            preConnectUris.Add(new Uri(file));
-        }
 
         private void AddFile(AssetType assetType, string path)
         {
@@ -135,7 +125,7 @@ namespace Our.Umbraco.TagHelpers
                 list.Add(path);
             }
 
-            httpContext.Items["css"] = list;
+            httpContext.Items[assetType.ToString()] = list;
         }
 
         private List<string> GetFiles(AssetType assetType)
@@ -154,10 +144,36 @@ namespace Our.Umbraco.TagHelpers
             return list;
         }
 
-        public static string GetFileContents(string path)
+        private List<string> GetFiles()
+        {
+            var list = new List<string>();
+
+            list.AddRange(GetFiles(AssetType.Css));
+            list.AddRange(GetFiles(AssetType.Js));
+
+            return list;
+        }
+
+        public string GetFileContents(string path)
         {
             var physicalPath = Path.Combine(_webHostEnvironment!.WebRootPath, path.TrimStart("/").Replace("/", "\\"));
             return !System.IO.File.Exists(physicalPath) ? string.Empty : System.IO.File.ReadAllText(physicalPath);
+        }
+
+        private List<string> GetPreConnectUrls()
+        {
+            var files = GetFiles();
+            var preConnectUrls = new List<string>();
+            foreach (string file in files)
+            {
+                if (!file.StartsWith("http", StringComparison.InvariantCultureIgnoreCase))
+                {
+                    continue;
+                }
+                preConnectUrls.Add((new Uri(file)).GetLeftPart(UriPartial.Authority));
+            }
+
+            return preConnectUrls;
         }
 
         private enum AssetType
